@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->middleware('throttle:api')->group(function () {
     Route::get('/health', fn () => ['status' => 'ok', 'timestamp' => now()->toIso8601String()]);
     Route::get('/market/xauusd', [MarketController::class, 'quote']);
+    Route::get('/market/usage', [MarketController::class, 'usage']);
     Route::get('/chart/xauusd', [MarketController::class, 'candles']);
     Route::get('/analysis/xauusd', [MarketController::class, 'analysis']);
     Route::post('/analysis/xauusd/ai', [MarketController::class, 'aiAnalysis']);

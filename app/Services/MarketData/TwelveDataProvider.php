@@ -22,6 +22,37 @@ final class TwelveDataProvider implements MarketDataProvider
         return (string) config('services.twelvedata.key');
     }
 
+    public function usage(): array
+    {
+        if ($this->key() === '') {
+            throw new RuntimeException('Market provider is not configured.');
+        }
+
+        return Cache::store(config('trading.cache_store'))->remember('market.api_usage', 300, function () {
+            $usage = Http::withHeaders(['Authorization' => 'apikey '.$this->key()])
+                ->timeout(10)
+                ->get('https://api.twelvedata.com/api_usage')
+                ->throw()
+                ->json();
+
+            if (! isset($usage['daily_usage'], $usage['plan_daily_limit'])) {
+                throw new RuntimeException($usage['message'] ?? 'API usage data unavailable.');
+            }
+
+            $used = (int) $usage['daily_usage'];
+            $limit = (int) $usage['plan_daily_limit'];
+
+            return [
+                'used' => $used,
+                'limit' => $limit,
+                'remaining' => max(0, $limit - $used),
+                'percent_used' => $limit > 0 ? round(($used / $limit) * 100, 1) : 0,
+                'plan' => $usage['plan_category'] ?? null,
+                'checked_at' => now()->toIso8601String(),
+            ];
+        });
+    }
+
     public function quote(string $symbol): array
     {
         if ($this->key() === '') {

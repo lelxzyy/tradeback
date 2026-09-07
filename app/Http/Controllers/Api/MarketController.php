@@ -28,6 +28,15 @@ final class MarketController extends Controller
         }
     }
 
+    public function usage(): JsonResponse
+    {
+        try {
+            return response()->json(['status' => 'ok', 'data' => $this->provider->usage()]);
+        } catch (Throwable $e) {
+            return $this->unavailable($e);
+        }
+    }
+
     public function candles(Request $r): JsonResponse
     {
         $v = $r->validate(['timeframe' => 'nullable|in:M1,M5,M15,M30,H1,H4,D1', 'limit' => 'nullable|integer|min:55|max:5000']);
