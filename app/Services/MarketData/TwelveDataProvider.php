@@ -46,7 +46,7 @@ final class TwelveDataProvider implements MarketDataProvider
             if (! $id || ! $vaultUrl) return $response->throw()->json();
 
             $excluded[] = $id;
-            Http::withToken($vaultSecret)->timeout(10)->post(rtrim($vaultUrl, '/').'/api/internal/provider-key', ['id' => $id, 'reason' => 'Daily credits exhausted']);
+            Http::withToken($vaultSecret)->timeout(10)->post(rtrim($vaultUrl, '/').'/api/internal/provider-key', ['id' => $id, 'reason' => $data['message'] ?? 'Rate limit']);
         }
         throw new RuntimeException('All Twelve Data API keys are exhausted.');
     }
