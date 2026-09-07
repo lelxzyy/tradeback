@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
+  "buildCommand": "echo 'Laravel API: no Vite build required'",
   "env": {
     "LOG_CHANNEL": "stderr",
     "SESSION_DRIVER": "cookie",
