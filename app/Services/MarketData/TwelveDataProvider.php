@@ -34,6 +34,7 @@ final class TwelveDataProvider implements MarketDataProvider
         if ($this->isQuietHours()) {
             $lastQuote = $cache->get($cacheKey.'.last');
             if (is_array($lastQuote)) {
+                $lastQuote['sync_enabled'] = false;
                 return $lastQuote;
             }
 
@@ -46,7 +47,7 @@ final class TwelveDataProvider implements MarketDataProvider
                 throw new RuntimeException($r['message'] ?? 'Provider error.');
             }
 
-            $quote = ['symbol' => $symbol, 'open' => (float) $r['open'], 'high' => (float) $r['high'], 'low' => (float) $r['low'], 'close' => (float) $r['close'], 'change_percent' => (float) $r['percent_change'], 'timestamp' => $r['datetime'] ?? now()->toIso8601String(), 'source' => 'Twelve Data'];
+            $quote = ['symbol' => $symbol, 'open' => (float) $r['open'], 'high' => (float) $r['high'], 'low' => (float) $r['low'], 'close' => (float) $r['close'], 'change_percent' => (float) $r['percent_change'], 'timestamp' => $r['datetime'] ?? now()->toIso8601String(), 'synced_at' => now()->toIso8601String(), 'sync_enabled' => true, 'source' => 'Twelve Data'];
             $cache->forever($cacheKey.'.last', $quote);
 
             return $quote;
