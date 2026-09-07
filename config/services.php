@@ -2,6 +2,7 @@
 
 return [
     'twelvedata' => ['key' => env('TWELVEDATA_API_KEY')],
+    'key_vault' => ['url' => env('KEY_VAULT_URL'), 'secret' => env('VAULT_INTERNAL_SECRET')],
     'openai' => [
         'key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_MODEL', 'gpt-5'),

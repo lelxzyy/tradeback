@@ -22,6 +22,35 @@ final class TwelveDataProvider implements MarketDataProvider
         return (string) config('services.twelvedata.key');
     }
 
+    private function request(string $endpoint, array $parameters): array
+    {
+        $vaultUrl = config('services.key_vault.url');
+        $vaultSecret = config('services.key_vault.secret');
+        $excluded = [];
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $id = null;
+            if ($vaultUrl && $vaultSecret) {
+                $selected = Http::withToken($vaultSecret)->timeout(10)->get(rtrim($vaultUrl, '/').'/api/internal/provider-key', ['exclude' => implode(',', $excluded)])->throw()->json();
+                $key = $selected['key'] ?? '';
+                $id = $selected['id'] ?? null;
+            } else {
+                $key = $this->key();
+            }
+            if ($key === '') throw new RuntimeException('Market provider is not configured.');
+
+            $response = Http::timeout(15)->get("https://api.twelvedata.com/$endpoint", [...$parameters, 'apikey' => $key]);
+            $data = $response->json();
+            $exhausted = $response->status() === 429 || (int) ($data['code'] ?? 0) === 429;
+            if (! $exhausted) return $response->throw()->json();
+            if (! $id || ! $vaultUrl) return $response->throw()->json();
+
+            $excluded[] = $id;
+            Http::withToken($vaultSecret)->timeout(10)->post(rtrim($vaultUrl, '/').'/api/internal/provider-key', ['id' => $id, 'reason' => 'Daily credits exhausted']);
+        }
+        throw new RuntimeException('All Twelve Data API keys are exhausted.');
+    }
+
     public function usage(): array
     {
         if ($this->key() === '') {
@@ -55,7 +84,7 @@ final class TwelveDataProvider implements MarketDataProvider
 
     public function quote(string $symbol): array
     {
-        if ($this->key() === '') {
+        if ($this->key() === '' && ! config('services.key_vault.url')) {
             throw new RuntimeException('Market provider is not configured.');
         }
 
@@ -73,7 +102,7 @@ final class TwelveDataProvider implements MarketDataProvider
         }
 
         return $cache->remember($cacheKey, config('trading.quote_ttl'), function () use ($symbol, $cache, $cacheKey) {
-            $r = Http::timeout(10)->get('https://api.twelvedata.com/quote', ['symbol' => $symbol, 'apikey' => $this->key()])->throw()->json();
+            $r = $this->request('quote', ['symbol' => $symbol]);
             if (($r['status'] ?? null) === 'error') {
                 throw new RuntimeException($r['message'] ?? 'Provider error.');
             }
@@ -87,7 +116,7 @@ final class TwelveDataProvider implements MarketDataProvider
 
     public function candles(string $symbol, string $timeframe, int $limit = 300): array
     {
-        if ($this->key() === '') {
+        if ($this->key() === '' && ! config('services.key_vault.url')) {
             throw new RuntimeException('Market provider is not configured.');
         }
 
@@ -105,7 +134,7 @@ final class TwelveDataProvider implements MarketDataProvider
 
         return $cache->remember($cacheKey, config('trading.candles_ttl'), function () use ($symbol, $timeframe, $limit, $cache, $cacheKey) {
             $map = ['M1' => '1min', 'M5' => '5min', 'M15' => '15min', 'M30' => '30min', 'H1' => '1h', 'H4' => '4h', 'D1' => '1day'];
-            $r = Http::timeout(15)->get('https://api.twelvedata.com/time_series', ['symbol' => $symbol, 'interval' => $map[$timeframe] ?? '15min', 'outputsize' => $limit, 'apikey' => $this->key()])->throw()->json();
+            $r = $this->request('time_series', ['symbol' => $symbol, 'interval' => $map[$timeframe] ?? '15min', 'outputsize' => $limit]);
             if (! isset($r['values'])) {
                 throw new RuntimeException($r['message'] ?? 'Candle data unavailable.');
             }
