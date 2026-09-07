@@ -8,6 +8,7 @@ use App\Services\Trading\AiAnalysisService;
 use App\Services\Trading\SignalEngine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 final class MarketController extends Controller
@@ -16,21 +17,39 @@ final class MarketController extends Controller
 
     private function unavailable(Throwable $e): JsonResponse
     {
-        return response()->json(['status' => 'unavailable', 'message' => 'Market Data Unavailable', 'detail' => app()->isLocal() ? $e->getMessage() : null], 503);
+        $message = strtolower($e->getMessage());
+        $code = match (true) {
+            str_contains($message, '401'), str_contains($message, 'unauthorized') => 'KEY_VAULT_UNAUTHORIZED',
+            str_contains($message, 'no active api key'), str_contains($message, '404') => 'NO_ACTIVE_API_KEY',
+            str_contains($message, '429'), str_contains($message, 'credits'), str_contains($message, 'exhausted') => 'API_CREDITS_EXHAUSTED',
+            str_contains($message, 'timed out'), str_contains($message, 'timeout') => 'PROVIDER_TIMEOUT',
+            str_contains($message, 'not configured') => 'PROVIDER_NOT_CONFIGURED',
+            default => 'MARKET_PROVIDER_ERROR',
+        };
+
+        report($e);
+
+        return response()->json(['status' => 'unavailable', 'message' => 'Market Data Unavailable', 'error_code' => $code, 'detail' => app()->isLocal() ? $e->getMessage() : null], 503);
     }
 
-    public function quote(): JsonResponse
+    public function quote(Request $request): JsonResponse
     {
         try {
+            if ($request->boolean('refresh')) {
+                Cache::store(config('trading.cache_store'))->forget('market.quote.'.md5(config('trading.symbol')));
+            }
             return response()->json(['status' => 'ok', 'data' => $this->provider->quote(config('trading.symbol'))]);
         } catch (Throwable $e) {
             return $this->unavailable($e);
         }
     }
 
-    public function usage(): JsonResponse
+    public function usage(Request $request): JsonResponse
     {
         try {
+            if ($request->boolean('refresh')) {
+                Cache::store(config('trading.cache_store'))->forget('market.api_usage');
+            }
             return response()->json(['status' => 'ok', 'data' => $this->provider->usage()]);
         } catch (Throwable $e) {
             return $this->unavailable($e);
