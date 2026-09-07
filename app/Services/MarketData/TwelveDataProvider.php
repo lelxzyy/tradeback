@@ -20,7 +20,7 @@ final class TwelveDataProvider implements MarketDataProvider
             throw new RuntimeException('Market provider is not configured.');
         }
 
-return Cache::store('file')->remember('market.quote.'.md5($symbol), 30, function () use ($symbol) {
+        return Cache::store(config('trading.cache_store'))->remember('market.quote.'.md5($symbol), 30, function () use ($symbol) {
             $r = Http::timeout(10)->get('https://api.twelvedata.com/quote', ['symbol' => $symbol, 'apikey' => $this->key()])->throw()->json();
             if (($r['status'] ?? null) === 'error') {
                 throw new RuntimeException($r['message'] ?? 'Provider error.');
@@ -36,7 +36,7 @@ return ['symbol' => $symbol, 'open' => (float) $r['open'], 'high' => (float) $r[
             throw new RuntimeException('Market provider is not configured.');
         }
 
-return Cache::store('file')->remember('market.candles.'.md5("$symbol:$timeframe:$limit"), 60, function () use ($symbol, $timeframe, $limit) {
+        return Cache::store(config('trading.cache_store'))->remember('market.candles.'.md5("$symbol:$timeframe:$limit"), 60, function () use ($symbol, $timeframe, $limit) {
             $map = ['M1' => '1min', 'M5' => '5min', 'M15' => '15min', 'M30' => '30min', 'H1' => '1h', 'H4' => '4h', 'D1' => '1day'];
             $r = Http::timeout(15)->get('https://api.twelvedata.com/time_series', ['symbol' => $symbol, 'interval' => $map[$timeframe] ?? '15min', 'outputsize' => $limit, 'apikey' => $this->key()])->throw()->json();
             if (! isset($r['values'])) {

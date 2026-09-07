@@ -16,7 +16,7 @@ final class AiAnalysisService
         }
         $fingerprint = hash('sha256', json_encode([$timeframe, $analysis]));
 
-        return Cache::store('file')->remember("ai.analysis.$fingerprint", 60, function () use ($key, $analysis, $timeframe) {
+        return Cache::store(config('trading.cache_store'))->remember("ai.analysis.$fingerprint", 60, function () use ($key, $analysis, $timeframe) {
             $response = Http::withToken($key)->timeout(30)->post('https://api.groq.com/openai/v1/chat/completions', [
                 'model' => config('services.groq.model', 'openai/gpt-oss-20b'),
                 'messages' => [
