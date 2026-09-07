@@ -23,4 +23,15 @@ if (! is_dir('/tmp/views')) {
     mkdir('/tmp/views', 0755, true);
 }
 
+// Vercel rewrites every request to this function. Restore the original path
+// so Laravel's router sees /api/v1/... instead of /api/index.php.
+if (isset($_GET['path'])) {
+    $path = '/'.ltrim((string) $_GET['path'], '/');
+    unset($_GET['path']);
+    $query = http_build_query($_GET);
+    $_SERVER['REQUEST_URI'] = $path.($query !== '' ? '?'.$query : '');
+    $_SERVER['SCRIPT_NAME'] = '/index.php';
+    $_SERVER['PHP_SELF'] = '/index.php';
+}
+
 require dirname(__DIR__).'/public/index.php';
